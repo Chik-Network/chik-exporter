@@ -8,16 +8,16 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/chia-network/go-chia-libs/pkg/rpc"
-	"github.com/chia-network/go-chia-libs/pkg/types"
+	"github.com/chik-network/go-chik-libs/pkg/rpc"
+	"github.com/chik-network/go-chik-libs/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/viper"
 
 	"github.com/oschwald/maxminddb-golang"
 
-	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
+	wrappedPrometheus "github.com/chik-network/go-modules/pkg/prometheus"
 
-	"github.com/chia-network/chia-exporter/internal/utils"
+	"github.com/chik-network/chik-exporter/internal/utils"
 )
 
 // Metrics that are based on Crawler RPC calls are in this file
@@ -45,15 +45,15 @@ type CrawlerServiceMetrics struct {
 // InitMetrics sets all the metrics properties
 func (s *CrawlerServiceMetrics) InitMetrics() {
 	// Crawler Metrics
-	s.totalNodes5Days = s.metrics.newGauge(chiaServiceCrawler, "total_nodes_5_days", "Total number of nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
-	s.reliableNodes = s.metrics.newGauge(chiaServiceCrawler, "reliable_nodes", "reliable nodes are nodes that have port 8444 open and have available space for more peer connections")
-	s.ipv4Nodes5Days = s.metrics.newGauge(chiaServiceCrawler, "ipv4_nodes_5_days", "Total number of IPv4 nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
-	s.ipv6Nodes5Days = s.metrics.newGauge(chiaServiceCrawler, "ipv6_nodes_5_days", "Total number of IPv6 nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
-	s.versionBuckets = s.metrics.newGaugeVec(chiaServiceCrawler, "peer_version", "Number of peers for each version. Only peers the crawler was able to connect to are included here.", []string{"version"})
-	s.countryNodeCountBuckets = s.metrics.newGaugeVec(chiaServiceCrawler, "country_node_count", "Number of peers gossiped in the last 5 days from each country.", []string{"country", "country_display"})
+	s.totalNodes5Days = s.metrics.newGauge(chikServiceCrawler, "total_nodes_5_days", "Total number of nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
+	s.reliableNodes = s.metrics.newGauge(chikServiceCrawler, "reliable_nodes", "reliable nodes are nodes that have port 9678 open and have available space for more peer connections")
+	s.ipv4Nodes5Days = s.metrics.newGauge(chikServiceCrawler, "ipv4_nodes_5_days", "Total number of IPv4 nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
+	s.ipv6Nodes5Days = s.metrics.newGauge(chikServiceCrawler, "ipv6_nodes_5_days", "Total number of IPv6 nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
+	s.versionBuckets = s.metrics.newGaugeVec(chikServiceCrawler, "peer_version", "Number of peers for each version. Only peers the crawler was able to connect to are included here.", []string{"version"})
+	s.countryNodeCountBuckets = s.metrics.newGaugeVec(chikServiceCrawler, "country_node_count", "Number of peers gossiped in the last 5 days from each country.", []string{"country", "country_display"})
 
 	// Debug Metric
-	s.debug = s.metrics.newGaugeVec(chiaServiceCrawler, "debug_metrics", "random debugging metrics distinguished by labels", []string{"key"})
+	s.debug = s.metrics.newGaugeVec(chikServiceCrawler, "debug_metrics", "random debugging metrics distinguished by labels", []string{"key"})
 
 	err := s.initMaxmindDB()
 	if err != nil {

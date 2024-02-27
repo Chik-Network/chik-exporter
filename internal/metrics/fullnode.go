@@ -7,23 +7,23 @@ import (
 	"os"
 	"time"
 
-	"github.com/chia-network/go-chia-libs/pkg/config"
-	"github.com/chia-network/go-chia-libs/pkg/rpc"
-	"github.com/chia-network/go-chia-libs/pkg/types"
+	"github.com/chik-network/go-chik-libs/pkg/config"
+	"github.com/chik-network/go-chik-libs/pkg/rpc"
+	"github.com/chik-network/go-chik-libs/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
+	wrappedPrometheus "github.com/chik-network/go-modules/pkg/prometheus"
 
-	"github.com/chia-network/chia-exporter/internal/utils"
+	"github.com/chik-network/chik-exporter/internal/utils"
 )
 
 // Metrics that are based on Full Node RPC calls are in this file
 
-// Fee data is based on the estimates here https://github.com/Chia-Network/chia-blockchain/blob/37fcafa0d31358f6ff7276a78764a0cc7ffeb030/chia/rpc/full_node_rpc_api.py#L754
+// Fee data is based on the estimates here https://github.com/Chik-Network/chik-blockchain/blob/37fcafa0d31358f6ff7276a78764a0cc7ffeb030/chik/rpc/full_node_rpc_api.py#L754
 const (
-	CostSendXch     = 9401710
+	CostSendXck     = 9401710
 	CostSendCat     = 36382111
 	CostTransferNFT = 74385541
 	CostTakeOffer   = 721393265
@@ -95,57 +95,57 @@ type FullNodeServiceMetrics struct {
 // InitMetrics sets all the metrics properties
 func (s *FullNodeServiceMetrics) InitMetrics() {
 	// BlockchainState Metrics
-	s.difficulty = s.metrics.newGauge(chiaServiceFullNode, "difficulty", "Current network difficulty")
-	s.mempoolCost = s.metrics.newGauge(chiaServiceFullNode, "mempool_cost", "Current mempool size in cost")
-	s.mempoolMinFee = s.metrics.newGaugeVec(chiaServiceFullNode, "mempool_min_fee", "Minimum fee to get into the mempool, in fee per cost, for a particular transaction cost", []string{"cost"})
-	s.mempoolSize = s.metrics.newGauge(chiaServiceFullNode, "mempool_size", "Number of spends in the mempool")
-	s.mempoolMaxTotalCost = s.metrics.newGauge(chiaServiceFullNode, "mempool_max_total_cost", "The maximum capacity of the mempool, in cost")
-	s.netspaceMiB = s.metrics.newGauge(chiaServiceFullNode, "netspace_mib", "Current estimated netspace, in MiB")
-	s.nodeHeight = s.metrics.newGauge(chiaServiceFullNode, "node_height", "Current height of the node")
-	s.nodeHeightSynced = s.metrics.newGauge(chiaServiceFullNode, "node_height_synced", "Current height of the node, when synced. This will register/unregister automatically depending on sync state, and should help make rate() more sane, when you don't want rate of syncing, only rate of the chain.")
-	s.nodeSynced = s.metrics.newGauge(chiaServiceFullNode, "node_synced", "Indicates whether this node is currently synced")
-	s.subSlotIters = s.metrics.newGauge(chiaServiceFullNode, "sub_slot_iters", "Current sub slot iters")
+	s.difficulty = s.metrics.newGauge(chikServiceFullNode, "difficulty", "Current network difficulty")
+	s.mempoolCost = s.metrics.newGauge(chikServiceFullNode, "mempool_cost", "Current mempool size in cost")
+	s.mempoolMinFee = s.metrics.newGaugeVec(chikServiceFullNode, "mempool_min_fee", "Minimum fee to get into the mempool, in fee per cost, for a particular transaction cost", []string{"cost"})
+	s.mempoolSize = s.metrics.newGauge(chikServiceFullNode, "mempool_size", "Number of spends in the mempool")
+	s.mempoolMaxTotalCost = s.metrics.newGauge(chikServiceFullNode, "mempool_max_total_cost", "The maximum capacity of the mempool, in cost")
+	s.netspaceMiB = s.metrics.newGauge(chikServiceFullNode, "netspace_mib", "Current estimated netspace, in MiB")
+	s.nodeHeight = s.metrics.newGauge(chikServiceFullNode, "node_height", "Current height of the node")
+	s.nodeHeightSynced = s.metrics.newGauge(chikServiceFullNode, "node_height_synced", "Current height of the node, when synced. This will register/unregister automatically depending on sync state, and should help make rate() more sane, when you don't want rate of syncing, only rate of the chain.")
+	s.nodeSynced = s.metrics.newGauge(chikServiceFullNode, "node_synced", "Indicates whether this node is currently synced")
+	s.subSlotIters = s.metrics.newGauge(chikServiceFullNode, "sub_slot_iters", "Current sub slot iters")
 
-	s.feeEstimates = s.metrics.newGaugeVec(chiaServiceFullNode, "fee_estimate", "Estimate of fee required to get a particular transaction cost in a block within a specified timeframe", []string{"type", "cost", "time"})
+	s.feeEstimates = s.metrics.newGaugeVec(chikServiceFullNode, "fee_estimate", "Estimate of fee required to get a particular transaction cost in a block within a specified timeframe", []string{"type", "cost", "time"})
 
 	// BlockCount Metrics
-	s.compactBlocks = s.metrics.newGauge(chiaServiceFullNode, "compact_blocks", "Number of fully compact blocks in this node's database")
-	s.uncompactBlocks = s.metrics.newGauge(chiaServiceFullNode, "uncompact_blocks", "Number of uncompact blocks in this node's database")
-	s.hintCount = s.metrics.newGauge(chiaServiceFullNode, "hint_count", "Number of hints in this nodes database")
+	s.compactBlocks = s.metrics.newGauge(chikServiceFullNode, "compact_blocks", "Number of fully compact blocks in this node's database")
+	s.uncompactBlocks = s.metrics.newGauge(chikServiceFullNode, "uncompact_blocks", "Number of uncompact blocks in this node's database")
+	s.hintCount = s.metrics.newGauge(chikServiceFullNode, "hint_count", "Number of hints in this nodes database")
 
 	// Connection Metrics
-	s.connectionCount = s.metrics.newGaugeVec(chiaServiceFullNode, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
+	s.connectionCount = s.metrics.newGaugeVec(chikServiceFullNode, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
 
 	// Block Metrics
-	s.maxBlockCost = s.metrics.newGauge(chiaServiceFullNode, "block_max_cost", "Max block size, in cost")
-	s.blockCost = s.metrics.newGauge(chiaServiceFullNode, "block_cost", "Total cost of all transactions in the last block")
-	s.blockFees = s.metrics.newGauge(chiaServiceFullNode, "block_fees", "Total fees in the last block")
-	s.kSize = s.metrics.newCounterVec(chiaServiceFullNode, "k_size", "Counts of winning plot size since the exporter was last started", []string{"size"})
-	s.preValidationTime = s.metrics.newGauge(chiaServiceFullNode, "pre_validation_time", "Last pre_validation_time from the block event")
-	s.validationTime = s.metrics.newGauge(chiaServiceFullNode, "validation_time", "Last validation time from the block event")
-	s.transactionBlockCounter = s.metrics.newCounter(chiaServiceFullNode, "transaction_blocks", "Number of transaction blocks seen since the exporter has started")
+	s.maxBlockCost = s.metrics.newGauge(chikServiceFullNode, "block_max_cost", "Max block size, in cost")
+	s.blockCost = s.metrics.newGauge(chikServiceFullNode, "block_cost", "Total cost of all transactions in the last block")
+	s.blockFees = s.metrics.newGauge(chikServiceFullNode, "block_fees", "Total fees in the last block")
+	s.kSize = s.metrics.newCounterVec(chikServiceFullNode, "k_size", "Counts of winning plot size since the exporter was last started", []string{"size"})
+	s.preValidationTime = s.metrics.newGauge(chikServiceFullNode, "pre_validation_time", "Last pre_validation_time from the block event")
+	s.validationTime = s.metrics.newGauge(chikServiceFullNode, "validation_time", "Last validation time from the block event")
+	s.transactionBlockCounter = s.metrics.newCounter(chikServiceFullNode, "transaction_blocks", "Number of transaction blocks seen since the exporter has started")
 
 	// Signage Point Metrics
-	s.totalSignagePoints = s.metrics.newCounter(chiaServiceFullNode, "total_signage_points", "Total number of signage points since the metrics exporter started. Only useful when combined with rate() or similar")
-	s.signagePointsSubSlot = s.metrics.newGauge(chiaServiceFullNode, "signage_points_sub_slot", "Number of signage points per sub slot")
-	s.currentSignagePoint = s.metrics.newGauge(chiaServiceFullNode, "current_signage_point", "Index of the last signage point received")
+	s.totalSignagePoints = s.metrics.newCounter(chikServiceFullNode, "total_signage_points", "Total number of signage points since the metrics exporter started. Only useful when combined with rate() or similar")
+	s.signagePointsSubSlot = s.metrics.newGauge(chikServiceFullNode, "signage_points_sub_slot", "Number of signage points per sub slot")
+	s.currentSignagePoint = s.metrics.newGauge(chikServiceFullNode, "current_signage_point", "Index of the last signage point received")
 
 	// File Size Metrics
-	s.database = s.metrics.newGauge(chiaServiceFullNode, "database_filesize", "Size of the database file")
-	s.databaseWal = s.metrics.newGauge(chiaServiceFullNode, "database_wal_filesize", "Size of the database wal file")
-	s.databaseShm = s.metrics.newGauge(chiaServiceFullNode, "database_shm_filesize", "Size of the database shm file")
-	s.peersDat = s.metrics.newGauge(chiaServiceFullNode, "peers_dat_filesize", "Size of peers.dat file")
-	s.heightToHash = s.metrics.newGauge(chiaServiceFullNode, "height_to_hash_filesize", "Size of height_to_hash file")
-	s.subEpochSummaries = s.metrics.newGauge(chiaServiceFullNode, "sub_epoch_summaries_filesize", "Size of sub_epoch_summaries file")
+	s.database = s.metrics.newGauge(chikServiceFullNode, "database_filesize", "Size of the database file")
+	s.databaseWal = s.metrics.newGauge(chikServiceFullNode, "database_wal_filesize", "Size of the database wal file")
+	s.databaseShm = s.metrics.newGauge(chikServiceFullNode, "database_shm_filesize", "Size of the database shm file")
+	s.peersDat = s.metrics.newGauge(chikServiceFullNode, "peers_dat_filesize", "Size of peers.dat file")
+	s.heightToHash = s.metrics.newGauge(chikServiceFullNode, "height_to_hash_filesize", "Size of height_to_hash file")
+	s.subEpochSummaries = s.metrics.newGauge(chikServiceFullNode, "sub_epoch_summaries_filesize", "Size of sub_epoch_summaries file")
 
 	// Reorg Related
-	s.lastBlockReorgDepth = s.metrics.newGauge(chiaServiceFullNode, "last_block_reorg_depth", "For the last block, the reorg depth. Generally expected to be zero, indicating no reorg happened for this block")
-	s.lastReorgReorgDepth = s.metrics.newGauge(chiaServiceFullNode, "last_reorg_reorg_depth", "For the last reorg that was seen, the reorg depth. This does not get set to a new value until the next reorg is seen")
-	s.lastBlockRolledBackRecords = s.metrics.newGauge(chiaServiceFullNode, "last_block_rolled_back_records", "For the last block, the number of records that were rolled back. Generally expected to be zero, indicating no reorg happened for this block")
-	s.lastReorgRolledBackRecords = s.metrics.newGauge(chiaServiceFullNode, "last_reorg_rolled_back_records", "For the last reorg that was seen, the number of records that were rolled back. This does not get set to a new value until the next reorg is seen")
+	s.lastBlockReorgDepth = s.metrics.newGauge(chikServiceFullNode, "last_block_reorg_depth", "For the last block, the reorg depth. Generally expected to be zero, indicating no reorg happened for this block")
+	s.lastReorgReorgDepth = s.metrics.newGauge(chikServiceFullNode, "last_reorg_reorg_depth", "For the last reorg that was seen, the reorg depth. This does not get set to a new value until the next reorg is seen")
+	s.lastBlockRolledBackRecords = s.metrics.newGauge(chikServiceFullNode, "last_block_rolled_back_records", "For the last block, the number of records that were rolled back. Generally expected to be zero, indicating no reorg happened for this block")
+	s.lastReorgRolledBackRecords = s.metrics.newGauge(chikServiceFullNode, "last_reorg_rolled_back_records", "For the last reorg that was seen, the number of records that were rolled back. This does not get set to a new value until the next reorg is seen")
 
 	// Debug Metric
-	s.debug = s.metrics.newGaugeVec(chiaServiceFullNode, "debug_metrics", "misc debugging metrics distinguished by labels", []string{"key"})
+	s.debug = s.metrics.newGaugeVec(chikServiceFullNode, "debug_metrics", "misc debugging metrics distinguished by labels", []string{"key"})
 }
 
 // InitialData is called on startup of the metrics server, to allow seeding metrics with
@@ -285,7 +285,7 @@ func (s *FullNodeServiceMetrics) GetFeeEstimates() {
 	}()
 
 	toCheck := map[string]uint64{
-		"send-xch":   CostSendXch,
+		"send-xck":   CostSendXck,
 		"send-cat":   CostSendCat,
 		"tx-nft":     CostTransferNFT,
 		"take-offer": CostTakeOffer,
@@ -401,10 +401,10 @@ func (s *FullNodeServiceMetrics) SignagePoint(resp *types.WebsocketResponse) {
 
 // RefreshFileSizes periodically checks how large files related to the full node are
 func (s *FullNodeServiceMetrics) RefreshFileSizes() {
-	log.Info("cron: chia_full_node updating file sizes")
-	cfg, err := config.GetChiaConfig()
+	log.Info("cron: chik_full_node updating file sizes")
+	cfg, err := config.GetChikConfig()
 	if err != nil {
-		log.Errorf("Error getting chia config: %s\n", err.Error())
+		log.Errorf("Error getting chik config: %s\n", err.Error())
 	}
 	database := cfg.GetFullPath(cfg.FullNode.DatabasePath)
 	databaseWal := fmt.Sprintf("%s-wal", database)
@@ -422,11 +422,11 @@ func (s *FullNodeServiceMetrics) RefreshFileSizes() {
 }
 
 func setGaugeToFilesize(file string, g *wrappedPrometheus.LazyGauge) error {
-	log.Debugf("file: chia_full_node Getting filesize of %s\n", file)
+	log.Debugf("file: chik_full_node Getting filesize of %s\n", file)
 	fi, err := os.Stat(file)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			log.Debugf("file: chia_full_node file doesn't exist: %s\n", file)
+			log.Debugf("file: chik_full_node file doesn't exist: %s\n", file)
 			return nil
 		}
 		return err

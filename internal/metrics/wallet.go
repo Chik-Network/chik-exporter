@@ -7,13 +7,13 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/chia-network/go-chia-libs/pkg/rpc"
-	"github.com/chia-network/go-chia-libs/pkg/types"
+	"github.com/chik-network/go-chik-libs/pkg/rpc"
+	"github.com/chik-network/go-chik-libs/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 
-	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
+	wrappedPrometheus "github.com/chik-network/go-modules/pkg/prometheus"
 
-	"github.com/chia-network/chia-exporter/internal/utils"
+	"github.com/chik-network/chik-exporter/internal/utils"
 )
 
 // Metrics that are based on Wallet RPC calls are in this file
@@ -41,19 +41,19 @@ type WalletServiceMetrics struct {
 // InitMetrics sets all the metrics properties
 func (s *WalletServiceMetrics) InitMetrics() {
 	// Connection Metrics
-	s.connectionCount = s.metrics.newGaugeVec(chiaServiceWallet, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
+	s.connectionCount = s.metrics.newGaugeVec(chikServiceWallet, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
 
 	// Wallet Metrics
-	s.walletSynced = s.metrics.newGauge(chiaServiceWallet, "synced", "")
+	s.walletSynced = s.metrics.newGauge(chikServiceWallet, "synced", "")
 	walletLabels := []string{"fingerprint", "wallet_id", "wallet_type", "asset_id"}
-	s.confirmedBalance = s.metrics.newGaugeVec(chiaServiceWallet, "confirmed_balance", "", walletLabels)
-	s.spendableBalance = s.metrics.newGaugeVec(chiaServiceWallet, "spendable_balance", "", walletLabels)
-	s.maxSendAmount = s.metrics.newGaugeVec(chiaServiceWallet, "max_send_amount", "", walletLabels)
-	s.pendingCoinRemovalCount = s.metrics.newGaugeVec(chiaServiceWallet, "pending_coin_removal_count", "", walletLabels)
-	s.unspentCoinCount = s.metrics.newGaugeVec(chiaServiceWallet, "unspent_coin_count", "", walletLabels)
+	s.confirmedBalance = s.metrics.newGaugeVec(chikServiceWallet, "confirmed_balance", "", walletLabels)
+	s.spendableBalance = s.metrics.newGaugeVec(chikServiceWallet, "spendable_balance", "", walletLabels)
+	s.maxSendAmount = s.metrics.newGaugeVec(chikServiceWallet, "max_send_amount", "", walletLabels)
+	s.pendingCoinRemovalCount = s.metrics.newGaugeVec(chikServiceWallet, "pending_coin_removal_count", "", walletLabels)
+	s.unspentCoinCount = s.metrics.newGaugeVec(chikServiceWallet, "unspent_coin_count", "", walletLabels)
 
 	// Debug Metric
-	s.debug = s.metrics.newGaugeVec(chiaServiceWallet, "debug_metrics", "misc debugging metrics distinguished by labels", []string{"key"})
+	s.debug = s.metrics.newGaugeVec(chikServiceWallet, "debug_metrics", "misc debugging metrics distinguished by labels", []string{"key"})
 }
 
 // InitialData is called on startup of the metrics server, to allow seeding metrics with

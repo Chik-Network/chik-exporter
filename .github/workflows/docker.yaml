@@ -3,11 +3,11 @@ name: Build Docker Images
 on:
   push:
     branches:
-      - main
+      - main1
     tags:
       - '**'
   pull_request:
 
 jobs:
   package:
-    uses: Chia-Network/actions/.github/workflows/docker-build.yaml@main
+    uses: Chik-Network/actions/.github/workflows/docker-build.yaml@main

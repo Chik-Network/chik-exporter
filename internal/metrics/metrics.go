@@ -9,23 +9,23 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	"github.com/chia-network/go-chia-libs/pkg/rpc"
-	"github.com/chia-network/go-chia-libs/pkg/types"
+	"github.com/chik-network/go-chik-libs/pkg/rpc"
+	"github.com/chik-network/go-chik-libs/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
+	wrappedPrometheus "github.com/chik-network/go-modules/pkg/prometheus"
 )
 
-type chiaService string
+type chikService string
 
 const (
-	chiaServiceFullNode  chiaService = "full_node"
-	chiaServiceWallet    chiaService = "wallet"
-	chiaServiceCrawler   chiaService = "crawler"
-	chiaServiceTimelord  chiaService = "timelord"
-	chiaServiceHarvester chiaService = "harvester"
-	chiaServiceFarmer    chiaService = "farmer"
+	chikServiceFullNode  chikService = "full_node"
+	chikServiceWallet    chikService = "wallet"
+	chikServiceCrawler   chikService = "crawler"
+	chikServiceTimelord  chikService = "timelord"
+	chikServiceHarvester chikService = "harvester"
+	chikServiceFarmer    chikService = "farmer"
 )
 
 // serviceMetrics defines methods that must be on all metrics services
@@ -65,7 +65,7 @@ type Metrics struct {
 	registry *prometheus.Registry
 
 	// All the serviceMetrics interfaces that are registered
-	serviceMetrics map[chiaService]serviceMetrics
+	serviceMetrics map[chikService]serviceMetrics
 }
 
 // NewMetrics returns a new instance of metrics
@@ -76,7 +76,7 @@ func NewMetrics(port uint16, logLevel log.Level) (*Metrics, error) {
 	metrics := &Metrics{
 		metricsPort:    port,
 		registry:       prometheus.NewRegistry(),
-		serviceMetrics: map[chiaService]serviceMetrics{},
+		serviceMetrics: map[chikService]serviceMetrics{},
 	}
 
 	log.SetLevel(logLevel)
@@ -101,12 +101,12 @@ func NewMetrics(port uint16, logLevel log.Level) (*Metrics, error) {
 
 	// Register each service's metrics
 
-	metrics.serviceMetrics[chiaServiceFullNode] = &FullNodeServiceMetrics{metrics: metrics}
-	metrics.serviceMetrics[chiaServiceWallet] = &WalletServiceMetrics{metrics: metrics}
-	metrics.serviceMetrics[chiaServiceCrawler] = &CrawlerServiceMetrics{metrics: metrics}
-	metrics.serviceMetrics[chiaServiceTimelord] = &TimelordServiceMetrics{metrics: metrics}
-	metrics.serviceMetrics[chiaServiceHarvester] = &HarvesterServiceMetrics{metrics: metrics}
-	metrics.serviceMetrics[chiaServiceFarmer] = &FarmerServiceMetrics{metrics: metrics}
+	metrics.serviceMetrics[chikServiceFullNode] = &FullNodeServiceMetrics{metrics: metrics}
+	metrics.serviceMetrics[chikServiceWallet] = &WalletServiceMetrics{metrics: metrics}
+	metrics.serviceMetrics[chikServiceCrawler] = &CrawlerServiceMetrics{metrics: metrics}
+	metrics.serviceMetrics[chikServiceTimelord] = &TimelordServiceMetrics{metrics: metrics}
+	metrics.serviceMetrics[chikServiceHarvester] = &HarvesterServiceMetrics{metrics: metrics}
+	metrics.serviceMetrics[chikServiceFarmer] = &FarmerServiceMetrics{metrics: metrics}
 
 	// Init each service's metrics
 	for _, service := range metrics.serviceMetrics {
@@ -117,9 +117,9 @@ func NewMetrics(port uint16, logLevel log.Level) (*Metrics, error) {
 }
 
 // newGauge returns a lazy gauge that follows naming conventions
-func (m *Metrics) newGauge(service chiaService, name string, help string) *wrappedPrometheus.LazyGauge {
+func (m *Metrics) newGauge(service chikService, name string, help string) *wrappedPrometheus.LazyGauge {
 	opts := prometheus.GaugeOpts{
-		Namespace: "chia",
+		Namespace: "chik",
 		Subsystem: string(service),
 		Name:      name,
 		Help:      help,
@@ -137,9 +137,9 @@ func (m *Metrics) newGauge(service chiaService, name string, help string) *wrapp
 
 // newGauge returns a gaugeVec that follows naming conventions and registers it with the prometheus collector
 // This doesn't need a lazy wrapper, as they're inherently lazy registered for each label value provided
-func (m *Metrics) newGaugeVec(service chiaService, name string, help string, labels []string) *prometheus.GaugeVec {
+func (m *Metrics) newGaugeVec(service chikService, name string, help string, labels []string) *prometheus.GaugeVec {
 	opts := prometheus.GaugeOpts{
-		Namespace: "chia",
+		Namespace: "chik",
 		Subsystem: string(service),
 		Name:      name,
 		Help:      help,
@@ -153,9 +153,9 @@ func (m *Metrics) newGaugeVec(service chiaService, name string, help string, lab
 }
 
 // newGauge returns a counter that follows naming conventions and registers it with the prometheus collector
-func (m *Metrics) newCounter(service chiaService, name string, help string) *wrappedPrometheus.LazyCounter {
+func (m *Metrics) newCounter(service chikService, name string, help string) *wrappedPrometheus.LazyCounter {
 	opts := prometheus.CounterOpts{
-		Namespace: "chia",
+		Namespace: "chik",
 		Subsystem: string(service),
 		Name:      name,
 		Help:      help,
@@ -172,9 +172,9 @@ func (m *Metrics) newCounter(service chiaService, name string, help string) *wra
 }
 
 // newCounterVec returns a counter that follows naming conventions and registers it with the prometheus collector
-func (m *Metrics) newCounterVec(service chiaService, name string, help string, labels []string) *prometheus.CounterVec {
+func (m *Metrics) newCounterVec(service chikService, name string, help string, labels []string) *prometheus.CounterVec {
 	opts := prometheus.CounterOpts{
-		Namespace: "chia",
+		Namespace: "chik",
 		Subsystem: string(service),
 		Name:      name,
 		Help:      help,
@@ -241,18 +241,18 @@ func (m *Metrics) websocketReceive(resp *types.WebsocketResponse, err error) {
 	log.Debugf("origin: %s command: %s destination: %s data: %s\n", resp.Origin, resp.Command, resp.Destination, string(resp.Data))
 
 	switch resp.Origin {
-	case "chia_full_node":
-		m.serviceMetrics[chiaServiceFullNode].ReceiveResponse(resp)
-	case "chia_wallet":
-		m.serviceMetrics[chiaServiceWallet].ReceiveResponse(resp)
-	case "chia_crawler":
-		m.serviceMetrics[chiaServiceCrawler].ReceiveResponse(resp)
-	case "chia_timelord":
-		m.serviceMetrics[chiaServiceTimelord].ReceiveResponse(resp)
-	case "chia_harvester":
-		m.serviceMetrics[chiaServiceHarvester].ReceiveResponse(resp)
-	case "chia_farmer":
-		m.serviceMetrics[chiaServiceFarmer].ReceiveResponse(resp)
+	case "chik_full_node":
+		m.serviceMetrics[chikServiceFullNode].ReceiveResponse(resp)
+	case "chik_wallet":
+		m.serviceMetrics[chikServiceWallet].ReceiveResponse(resp)
+	case "chik_crawler":
+		m.serviceMetrics[chikServiceCrawler].ReceiveResponse(resp)
+	case "chik_timelord":
+		m.serviceMetrics[chikServiceTimelord].ReceiveResponse(resp)
+	case "chik_harvester":
+		m.serviceMetrics[chikServiceHarvester].ReceiveResponse(resp)
+	case "chik_farmer":
+		m.serviceMetrics[chikServiceFarmer].ReceiveResponse(resp)
 	}
 }
 

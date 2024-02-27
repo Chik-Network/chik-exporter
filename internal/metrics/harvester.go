@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chia-network/go-chia-libs/pkg/protocols"
-	"github.com/chia-network/go-chia-libs/pkg/rpc"
-	"github.com/chia-network/go-chia-libs/pkg/types"
+	"github.com/chik-network/go-chik-libs/pkg/protocols"
+	"github.com/chik-network/go-chik-libs/pkg/rpc"
+	"github.com/chik-network/go-chik-libs/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
-	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
+	wrappedPrometheus "github.com/chik-network/go-modules/pkg/prometheus"
 
-	"github.com/chia-network/chia-exporter/internal/utils"
+	"github.com/chik-network/chik-exporter/internal/utils"
 )
 
 // Metrics that are based on Harvester RPC calls are in this file
@@ -49,23 +49,23 @@ type HarvesterServiceMetrics struct {
 // InitMetrics sets all the metrics properties
 func (s *HarvesterServiceMetrics) InitMetrics() {
 	// Connection Metrics
-	s.connectionCount = s.metrics.newGaugeVec(chiaServiceHarvester, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
+	s.connectionCount = s.metrics.newGaugeVec(chikServiceHarvester, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
 
 	plotLabels := []string{"size", "type", "compression"}
-	s.totalPlots = s.metrics.newGauge(chiaServiceHarvester, "total_plots", "Total number of plots on this harvester")
-	s.plotFilesize = s.metrics.newGaugeVec(chiaServiceHarvester, "plot_filesize", "Total filesize of plots on this harvester, by K size", plotLabels)
-	s.plotCount = s.metrics.newGaugeVec(chiaServiceHarvester, "plot_count", "Total count of plots on this harvester, by K size", plotLabels)
+	s.totalPlots = s.metrics.newGauge(chikServiceHarvester, "total_plots", "Total number of plots on this harvester")
+	s.plotFilesize = s.metrics.newGaugeVec(chikServiceHarvester, "plot_filesize", "Total filesize of plots on this harvester, by K size", plotLabels)
+	s.plotCount = s.metrics.newGaugeVec(chikServiceHarvester, "plot_count", "Total count of plots on this harvester, by K size", plotLabels)
 
-	s.totalFoundProofs = s.metrics.newCounter(chiaServiceHarvester, "total_found_proofs", "Counter of total found proofs since the exporter started")
-	s.lastFoundProofs = s.metrics.newGauge(chiaServiceHarvester, "last_found_proofs", "Number of proofs found for the last farmer_info event")
+	s.totalFoundProofs = s.metrics.newCounter(chikServiceHarvester, "total_found_proofs", "Counter of total found proofs since the exporter started")
+	s.lastFoundProofs = s.metrics.newGauge(chikServiceHarvester, "last_found_proofs", "Number of proofs found for the last farmer_info event")
 
-	s.totalEligiblePlots = s.metrics.newCounter(chiaServiceHarvester, "total_eligible_plots", "Counter of total eligible plots since the exporter started")
-	s.lastEligiblePlots = s.metrics.newGauge(chiaServiceHarvester, "last_eligible_plots", "Number of eligible plots for the last farmer_info event")
+	s.totalEligiblePlots = s.metrics.newCounter(chikServiceHarvester, "total_eligible_plots", "Counter of total eligible plots since the exporter started")
+	s.lastEligiblePlots = s.metrics.newGauge(chikServiceHarvester, "last_eligible_plots", "Number of eligible plots for the last farmer_info event")
 
-	s.lastLookupTime = s.metrics.newGauge(chiaServiceHarvester, "last_lookup_time", "Lookup time for the last farmer_info event")
+	s.lastLookupTime = s.metrics.newGauge(chikServiceHarvester, "last_lookup_time", "Lookup time for the last farmer_info event")
 
 	// Debug Metric
-	s.debug = s.metrics.newGaugeVec(chiaServiceHarvester, "debug_metrics", "random debugging metrics distinguished by labels", []string{"key"})
+	s.debug = s.metrics.newGaugeVec(chikServiceHarvester, "debug_metrics", "random debugging metrics distinguished by labels", []string{"key"})
 }
 
 // InitialData is called on startup of the metrics server, to allow seeding metrics with current/initial data

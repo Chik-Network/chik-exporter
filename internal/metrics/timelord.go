@@ -5,12 +5,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/chia-network/go-chia-libs/pkg/types"
+	"github.com/chik-network/go-chik-libs/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 
-	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
+	wrappedPrometheus "github.com/chik-network/go-modules/pkg/prometheus"
 
-	"github.com/chia-network/chia-exporter/internal/utils"
+	"github.com/chik-network/chik-exporter/internal/utils"
 )
 
 // Metrics that are based on Timelord RPC calls are in this file
@@ -32,13 +32,13 @@ type TimelordServiceMetrics struct {
 
 // InitMetrics sets all the metrics properties
 func (s *TimelordServiceMetrics) InitMetrics() {
-	s.fastestTimelord = s.metrics.newCounter(chiaServiceTimelord, "fastest_timelord", "Counter for how many times this timelord has been fastest since the exporter has been running")
-	s.slowTimelord = s.metrics.newCounter(chiaServiceTimelord, "slow_timelord", "Counter for how many times this timelord has NOT been the fastest since the exporter has been running")
-	s.estimatedIPS = s.metrics.newGauge(chiaServiceTimelord, "estimated_ips", "Current estimated IPS. Updated every time a new PoT Challenge is complete")
-	s.compactProofsFound = s.metrics.newCounterVec(chiaServiceTimelord, "compact_proofs_completed", "Count of the number of compact proofs by proof type since the exporter was started", []string{"vdf_field"})
+	s.fastestTimelord = s.metrics.newCounter(chikServiceTimelord, "fastest_timelord", "Counter for how many times this timelord has been fastest since the exporter has been running")
+	s.slowTimelord = s.metrics.newCounter(chikServiceTimelord, "slow_timelord", "Counter for how many times this timelord has NOT been the fastest since the exporter has been running")
+	s.estimatedIPS = s.metrics.newGauge(chikServiceTimelord, "estimated_ips", "Current estimated IPS. Updated every time a new PoT Challenge is complete")
+	s.compactProofsFound = s.metrics.newCounterVec(chikServiceTimelord, "compact_proofs_completed", "Count of the number of compact proofs by proof type since the exporter was started", []string{"vdf_field"})
 
 	// Debug Metric
-	s.debug = s.metrics.newGaugeVec(chiaServiceTimelord, "debug_metrics", "random debugging metrics distinguished by labels", []string{"key"})
+	s.debug = s.metrics.newGaugeVec(chikServiceTimelord, "debug_metrics", "random debugging metrics distinguished by labels", []string{"key"})
 }
 
 // InitialData is called on startup of the metrics server, to allow seeding metrics with

@@ -4,15 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/chia-network/go-chia-libs/pkg/rpc"
-	"github.com/chia-network/go-chia-libs/pkg/types"
+	"github.com/chik-network/go-chik-libs/pkg/rpc"
+	"github.com/chik-network/go-chik-libs/pkg/types"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
-	wrappedPrometheus "github.com/chia-network/go-modules/pkg/prometheus"
+	wrappedPrometheus "github.com/chik-network/go-modules/pkg/prometheus"
 
-	"github.com/chia-network/chia-exporter/internal/utils"
+	"github.com/chik-network/chik-exporter/internal/utils"
 )
 
 // Metrics that are based on Farmer RPC calls are in this file
@@ -62,29 +62,29 @@ func (s *FarmerServiceMetrics) InitMetrics() {
 	s.nodeIDToHostname = map[types.Bytes32]string{}
 
 	// Connection Metrics
-	s.connectionCount = s.metrics.newGaugeVec(chiaServiceFarmer, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
+	s.connectionCount = s.metrics.newGaugeVec(chikServiceFarmer, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
 
 	// Partial/Pooling Metrics, by launcher ID
 	poolLabels := []string{"launcher_id"}
-	s.submittedPartials = s.metrics.newCounterVec(chiaServiceFarmer, "submitted_partials", "Number of partials submitted since the exporter was started", poolLabels)
-	s.currentDifficulty = s.metrics.newGaugeVec(chiaServiceFarmer, "current_difficulty", "Current difficulty for this launcher id", poolLabels)
-	s.pointsAckSinceStart = s.metrics.newGaugeVec(chiaServiceFarmer, "points_acknowledged_since_start", "Points acknowledged since start. This is calculated by chia, NOT since start of the exporter.", poolLabels)
+	s.submittedPartials = s.metrics.newCounterVec(chikServiceFarmer, "submitted_partials", "Number of partials submitted since the exporter was started", poolLabels)
+	s.currentDifficulty = s.metrics.newGaugeVec(chikServiceFarmer, "current_difficulty", "Current difficulty for this launcher id", poolLabels)
+	s.pointsAckSinceStart = s.metrics.newGaugeVec(chikServiceFarmer, "points_acknowledged_since_start", "Points acknowledged since start. This is calculated by chik, NOT since start of the exporter.", poolLabels)
 
 	// Proof Metrics
-	s.proofsFound = s.metrics.newCounter(chiaServiceFarmer, "proofs_found", "Number of proofs found since the exporter has been running")
+	s.proofsFound = s.metrics.newCounter(chikServiceFarmer, "proofs_found", "Number of proofs found since the exporter has been running")
 
 	// Remote harvester plot counts
 	plotLabels := []string{"host", "node_id", "size", "type", "compression"}
-	s.plotFilesize = s.metrics.newGaugeVec(chiaServiceFarmer, "plot_filesize", "Filesize of plots separated by harvester", plotLabels)
-	s.plotCount = s.metrics.newGaugeVec(chiaServiceFarmer, "plot_count", "Number of plots separated by harvester", plotLabels)
-	s.totalFoundProofs = s.metrics.newCounterVec(chiaServiceFarmer, "total_found_proofs", "Counter of total found proofs since the exporter started", []string{"host", "node_id"})
-	s.lastFoundProofs = s.metrics.newGaugeVec(chiaServiceFarmer, "last_found_proofs", "Number of proofs found for the last farmer_info event", []string{"host", "node_id"})
-	s.totalEligiblePlots = s.metrics.newCounterVec(chiaServiceFarmer, "total_eligible_plots", "Counter of total eligible plots since the exporter started", []string{"host", "node_id"})
-	s.lastEligiblePlots = s.metrics.newGaugeVec(chiaServiceFarmer, "last_eligible_plots", "Number of eligible plots for the last farmer_info event", []string{"host", "node_id"})
-	s.lastLookupTime = s.metrics.newGaugeVec(chiaServiceFarmer, "last_lookup_time", "Lookup time for the last farmer_info event", []string{"host", "node_id"})
+	s.plotFilesize = s.metrics.newGaugeVec(chikServiceFarmer, "plot_filesize", "Filesize of plots separated by harvester", plotLabels)
+	s.plotCount = s.metrics.newGaugeVec(chikServiceFarmer, "plot_count", "Number of plots separated by harvester", plotLabels)
+	s.totalFoundProofs = s.metrics.newCounterVec(chikServiceFarmer, "total_found_proofs", "Counter of total found proofs since the exporter started", []string{"host", "node_id"})
+	s.lastFoundProofs = s.metrics.newGaugeVec(chikServiceFarmer, "last_found_proofs", "Number of proofs found for the last farmer_info event", []string{"host", "node_id"})
+	s.totalEligiblePlots = s.metrics.newCounterVec(chikServiceFarmer, "total_eligible_plots", "Counter of total eligible plots since the exporter started", []string{"host", "node_id"})
+	s.lastEligiblePlots = s.metrics.newGaugeVec(chikServiceFarmer, "last_eligible_plots", "Number of eligible plots for the last farmer_info event", []string{"host", "node_id"})
+	s.lastLookupTime = s.metrics.newGaugeVec(chikServiceFarmer, "last_lookup_time", "Lookup time for the last farmer_info event", []string{"host", "node_id"})
 
 	// Debug Metric
-	s.debug = s.metrics.newGaugeVec(chiaServiceFarmer, "debug_metrics", "random debugging metrics distinguished by labels", []string{"key"})
+	s.debug = s.metrics.newGaugeVec(chikServiceFarmer, "debug_metrics", "random debugging metrics distinguished by labels", []string{"key"})
 }
 
 // InitialData is called on startup of the metrics server, to allow seeding metrics with current/initial data

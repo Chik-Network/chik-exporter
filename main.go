@@ -1,6 +1,6 @@
 package main
 
-import "github.com/chia-network/chia-exporter/cmd"
+import "github.com/chik-network/chik-exporter/cmd"
 
 func main() {
 	cmd.Execute()

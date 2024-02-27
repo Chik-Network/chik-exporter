@@ -4,13 +4,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/chia-network/go-chia-libs/pkg/config"
+	"github.com/chik-network/go-chik-libs/pkg/config"
 	log "github.com/sirupsen/logrus"
 )
 
 // LogToFile logs a message to a given file
 func LogToFile(filename, message string) error {
-	rootPath, err := config.GetChiaRootPath()
+	rootPath, err := config.GetChikRootPath()
 	if err != nil {
 		return err
 	}

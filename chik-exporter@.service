@@ -1,9 +1,9 @@
 [Unit]
-Description = Chia Exporter Service
+Description = Chik Exporter Service
 
 [Service]
 Type = simple
-ExecStart=/usr/local/bin/chia-exporter serve
+ExecStart=/usr/local/bin/chik-exporter serve
 User=%i
 Group=%i
 

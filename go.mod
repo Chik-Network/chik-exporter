@@ -1,10 +1,10 @@
-module github.com/chia-network/chia-exporter
+module github.com/chik-network/chik-exporter
 
 go 1.21
 
 require (
-	github.com/chia-network/go-chia-libs v0.5.3
-	github.com/chia-network/go-modules v0.0.4
+	github.com/chik-network/go-chik-libs v0.5.3
+	github.com/chik-network/go-modules v0.0.4
 	github.com/oschwald/maxminddb-golang v1.12.0
 	github.com/prometheus/client_golang v1.18.0
 	github.com/sirupsen/logrus v1.9.3
