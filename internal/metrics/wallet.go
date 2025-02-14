@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -23,6 +24,12 @@ type WalletServiceMetrics struct {
 	// Holds a reference to the main metrics container this is a part of
 	metrics *Metrics
 
+	// General Service Metrics
+	gotVersionResponse bool
+	version            *prometheus.GaugeVec
+
+	gotWalletsResponse bool
+
 	// Connection Metrics
 	connectionCount *prometheus.GaugeVec
 
@@ -40,6 +47,9 @@ type WalletServiceMetrics struct {
 
 // InitMetrics sets all the metrics properties
 func (s *WalletServiceMetrics) InitMetrics(network *string) {
+	// General Service Metrics
+	s.version = s.metrics.newGaugeVec(chikServiceWallet, "version", "The version of chik-blockchain the service is running", []string{"version"})
+
 	// Connection Metrics
 	s.connectionCount = s.metrics.newGaugeVec(chikServiceWallet, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
 
@@ -59,22 +69,35 @@ func (s *WalletServiceMetrics) InitMetrics(network *string) {
 // InitialData is called on startup of the metrics server, to allow seeding metrics with
 // current/initial data
 func (s *WalletServiceMetrics) InitialData() {
+	// Only get the version on an initial or reconnection
+	utils.LogErr(s.metrics.client.WalletService.GetVersion(&rpc.GetVersionOptions{}))
+
 	utils.LogErr(s.metrics.client.WalletService.GetWallets(&rpc.GetWalletsOptions{}))
 	utils.LogErr(s.metrics.client.WalletService.GetSyncStatus())
 }
 
 // SetupPollingMetrics starts any metrics that happen on an interval
-func (s *WalletServiceMetrics) SetupPollingMetrics() {
-	go func() {
+func (s *WalletServiceMetrics) SetupPollingMetrics(ctx context.Context) {
+	// Things that update in the background
+	go func(ctx context.Context) {
 		for {
-			utils.LogErr(s.metrics.client.WalletService.GetConnections(&rpc.GetConnectionsOptions{}))
-			time.Sleep(15 * time.Second)
+			select {
+			case <-ctx.Done():
+				// Exit the loop if the context is canceled
+				return
+			default:
+				utils.LogErr(s.metrics.client.WalletService.GetConnections(&rpc.GetConnectionsOptions{}))
+				time.Sleep(15 * time.Second)
+			}
 		}
-	}()
+	}(ctx)
 }
 
 // Disconnected clears/unregisters metrics when the connection drops
 func (s *WalletServiceMetrics) Disconnected() {
+	s.version.Reset()
+	s.gotVersionResponse = false
+	s.gotWalletsResponse = false
 	s.connectionCount.Reset()
 	s.walletSynced.Unregister()
 	s.confirmedBalance.Reset()
@@ -91,7 +114,21 @@ func (s *WalletServiceMetrics) Reconnected() {
 
 // ReceiveResponse handles wallet responses that are returned over the websocket
 func (s *WalletServiceMetrics) ReceiveResponse(resp *types.WebsocketResponse) {
+	// Sometimes, when we reconnect, or start exporter before chik is running
+	// the daemon is up before the service, and the initial request for the version
+	// doesn't make it to the service
+	// daemon doesn't queue these messages for later, they just get dropped
+	if !s.gotVersionResponse {
+		utils.LogErr(s.metrics.client.FullNodeService.GetVersion(&rpc.GetVersionOptions{}))
+	}
+	if !s.gotWalletsResponse {
+		utils.LogErr(s.metrics.client.WalletService.GetWallets(&rpc.GetWalletsOptions{}))
+	}
+
 	switch resp.Command {
+	case "get_version":
+		versionHelper(resp, s.version)
+		s.gotVersionResponse = true
 	case "get_connections":
 		s.GetConnections(resp)
 	case "coin_added":
@@ -104,6 +141,7 @@ func (s *WalletServiceMetrics) ReceiveResponse(resp *types.WebsocketResponse) {
 		s.GetWalletBalance(resp)
 	case "get_wallets":
 		s.GetWallets(resp)
+		s.gotWalletsResponse = true
 	case "debug":
 		debugHelper(resp, s.debug)
 	}

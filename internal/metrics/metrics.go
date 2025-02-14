@@ -1,11 +1,15 @@
 package metrics
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -42,7 +46,7 @@ type serviceMetrics interface {
 
 	// SetupPollingMetrics Some services need data that doesn't have a good event to hook into
 	// In those cases, we have to fall back to polling
-	SetupPollingMetrics()
+	SetupPollingMetrics(ctx context.Context)
 
 	// ReceiveResponse is called when a response is received for the particular metrics service
 	ReceiveResponse(*types.WebsocketResponse)
@@ -59,6 +63,7 @@ type Metrics struct {
 	metricsPort uint16
 	client      *rpc.Client
 	network     *string
+	lastReceive time.Time
 
 	// httpClient is another instance of the rpc.Client in HTTP mode
 	// This is used rarely, to request data in response to a websocket event that is too large to fit on a single
@@ -74,25 +79,26 @@ type Metrics struct {
 
 	// All the serviceMetrics interfaces that are registered
 	serviceMetrics map[chikService]serviceMetrics
+
+	version         string
+	buildInfoMetric *prometheus.GaugeVec
 }
 
 // NewMetrics returns a new instance of metrics
 // All metrics are registered here
-func NewMetrics(port uint16, logLevel log.Level) (*Metrics, error) {
+func NewMetrics(port uint16, logLevel log.Level, version string) (*Metrics, error) {
 	var err error
 
 	metrics := &Metrics{
 		metricsPort:    port,
 		registry:       prometheus.NewRegistry(),
 		serviceMetrics: map[chikService]serviceMetrics{},
+		version:        version,
 	}
 
 	log.SetLevel(logLevel)
 
-	metrics.client, err = rpc.NewClient(rpc.ConnectionModeWebsocket, rpc.WithAutoConfig(), rpc.WithBaseURL(&url.URL{
-		Scheme: "wss",
-		Host:   viper.GetString("hostname"),
-	}))
+	err = metrics.setNewClient()
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +119,7 @@ func NewMetrics(port uint16, logLevel log.Level) (*Metrics, error) {
 	}
 	err = metrics.initTables()
 	if err != nil {
-		log.Errorf("Error ensuring tables exist in MySQL. Will not process or store any MySQL only metrics: %s\n", err.Error())
+		log.Debugf("Error ensuring tables exist in MySQL. Will not process or store any MySQL only metrics: %s\n", err.Error())
 		metrics.mysqlClient = nil
 	}
 
@@ -129,12 +135,38 @@ func NewMetrics(port uint16, logLevel log.Level) (*Metrics, error) {
 	// If not, the reconnect handler will handle it later
 	_, _ = metrics.checkNetwork()
 
-	// Init each service's metrics
-	for _, service := range metrics.serviceMetrics {
-		service.InitMetrics(metrics.network)
-	}
+	metrics.initMetrics()
 
 	return metrics, nil
+}
+
+func (m *Metrics) setNewClient() error {
+	if m.client != nil {
+		err := m.client.Close()
+		if err != nil {
+			log.Error("Error closing old client", "error", err)
+		}
+	}
+	client, err := rpc.NewClient(rpc.ConnectionModeWebsocket, rpc.WithAutoConfig(), rpc.WithBaseURL(&url.URL{
+		Scheme: "wss",
+		Host:   viper.GetString("hostname"),
+	}))
+	if err != nil {
+		return err
+	}
+	m.client = client
+	return nil
+}
+
+func (m *Metrics) initMetrics() {
+	// Initialize global metrics
+	m.buildInfoMetric = m.newGaugeVec(chikService("exporter"), "build_info", "Build info for chik exporter", []string{"version"})
+	m.buildInfoMetric.WithLabelValues(m.version).Set(1)
+
+	// Init each service's metrics
+	for _, service := range m.serviceMetrics {
+		service.InitMetrics(m.network)
+	}
 }
 
 func (m *Metrics) createDBClient() error {
@@ -316,25 +348,69 @@ func (m *Metrics) OpenWebsocket() error {
 	if changed {
 		m.registry = prometheus.NewRegistry()
 		m.dynamicPromHandler.updateHandler(promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{}))
-		// Init each service's metrics
-		for _, service := range m.serviceMetrics {
-			service.InitMetrics(m.network)
-		}
+		m.initMetrics()
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	for _, service := range m.serviceMetrics {
 		service.InitialData()
-		service.SetupPollingMetrics()
+		service.SetupPollingMetrics(ctx)
 	}
 
+	m.lastReceive = time.Now()
+	go func() {
+		sighup := make(chan os.Signal, 1)
+		signal.Notify(sighup, syscall.SIGHUP)
+
+		for {
+			select {
+			case <-sighup:
+				log.Info("Got SIGHUP. Recreating websocket connection...")
+				err := m.doTimeoutReconnect(cancel)
+				if err != nil {
+					log.Errorf(err.Error())
+					continue
+				}
+				return
+			case <-time.After(10 * time.Second):
+				// If we don't get any events for 5 minutes, we'll reset the connection
+				if m.lastReceive.Before(time.Now().Add(-5 * time.Minute)) {
+					log.Info("Websocket connection seems down. Recreating...")
+					err := m.doTimeoutReconnect(cancel)
+					if err != nil {
+						log.Errorf(err.Error())
+						continue
+					}
+					return
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (m *Metrics) doTimeoutReconnect(cancel context.CancelFunc) error {
+	cancel()
+	m.disconnectHandler()
+	err := m.setNewClient()
+	if err != nil {
+		return fmt.Errorf("error creating new client: %w", err)
+	}
+
+	err = m.OpenWebsocket()
+	if err != nil {
+		return fmt.Errorf("error opening websocket on new client: %w", err)
+	}
+
+	// Got the new connection open, so stop the loop on the old connection
+	// since we called this function again and a new loop was created
 	return nil
 }
 
 // CloseWebsocket closes the websocket connection
 func (m *Metrics) CloseWebsocket() error {
-	// @TODO reenable once fixed in the upstream dep
-	//return m.client.DaemonService.CloseConnection()
-	return nil
+	return m.client.Close()
 }
 
 // StartServer starts the metrics server
@@ -353,6 +429,8 @@ func (m *Metrics) websocketReceive(resp *types.WebsocketResponse, err error) {
 		log.Errorf("Websocket received err: %s\n", err.Error())
 		return
 	}
+
+	m.lastReceive = time.Now()
 
 	log.Printf("recv: %s %s\n", resp.Origin, resp.Command)
 	log.Debugf("origin: %s command: %s destination: %s data: %s\n", resp.Origin, resp.Command, resp.Destination, string(resp.Data))
@@ -396,9 +474,9 @@ func (m *Metrics) reconnectHandler() {
 		log.Info("Network Changed, resetting all metrics")
 		m.registry = prometheus.NewRegistry()
 		m.dynamicPromHandler.updateHandler(promhttp.HandlerFor(m.registry, promhttp.HandlerOpts{}))
-		// Init each service's metrics
+		m.initMetrics()
+		// Init each service's data
 		for _, service := range m.serviceMetrics {
-			service.InitMetrics(m.network)
 			service.InitialData()
 		}
 	} else {
@@ -458,6 +536,17 @@ func connectionCountHelper(resp *types.WebsocketResponse, connectionCount *prome
 	connectionCount.WithLabelValues("timelord").Set(timelord)
 	connectionCount.WithLabelValues("introducer").Set(introducer)
 	connectionCount.WithLabelValues("wallet").Set(wallet)
+}
+
+func versionHelper(resp *types.WebsocketResponse, versionMetric *prometheus.GaugeVec) {
+	version := &rpc.GetVersionResponse{}
+	err := json.Unmarshal(resp.Data, version)
+	if err != nil {
+		log.Errorf("Error unmarshalling: %s\n", err.Error())
+		return
+	}
+
+	versionMetric.WithLabelValues(version.Version).Set(1)
 }
 
 type debugEvent struct {

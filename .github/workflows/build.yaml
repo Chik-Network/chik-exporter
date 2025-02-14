@@ -33,7 +33,7 @@ jobs:
         run: make build
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: chik-exporter-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
           path: ${{ github.workspace }}/bin/chik-exporter*
@@ -58,7 +58,7 @@ jobs:
       - name: Install fpm
         run: sudo gem install fpm
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: chik-exporter-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
           path: artifacts
@@ -80,7 +80,7 @@ jobs:
           mv *.deb installer-out/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: installer-chik-exporter-${{ matrix.GOOS }}-${{ matrix.GOARCH }}
           path: ${{ github.workspace }}/installer-out/*.deb
@@ -97,7 +97,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
 
@@ -130,10 +130,10 @@ jobs:
             $RELEASE_TAG \
             artifacts/installer-chik-exporter*/*.deb
 
-      - uses: Chik-Network/actions/github/jwt@main
-
-      - name: Trigger apt repo update
-        if: env.FULL_RELEASE == 'true'
-        run: |
-          curl -s -XPOST -H "Authorization: Bearer ${{ env.JWT_TOKEN }}" --data '{"release_version":"${{ env.RELEASE_TAG }}"}' ${{ secrets.GLUE_API_URL }}/api/v1/chik-exporter/${{ github.sha }}/start
-          curl -s -XPOST -H "Authorization: Bearer ${{ env.JWT_TOKEN }}" --data '{"release_version":"${{ env.RELEASE_TAG }}"}' ${{ secrets.GLUE_API_URL }}/api/v1/chik-exporter/${{ github.sha }}/success/deploy
+      - uses: Chik-Network/actions/github/glue@main
+        if: env.FULL_RELEASE == 'true' && '1' == '2'
+        with:
+          json_data: '{"release_version":"${{ env.RELEASE_TAG }}"}'
+          glue_url: ${{ secrets.GLUE_API_URL }}
+          glue_project: "chik-exporter"
+          glue_path: "trigger"

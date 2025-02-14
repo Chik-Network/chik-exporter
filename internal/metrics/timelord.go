@@ -1,8 +1,10 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 
+	"github.com/chik-network/go-chik-libs/pkg/rpc"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/chik-network/go-chik-libs/pkg/types"
@@ -20,6 +22,10 @@ type TimelordServiceMetrics struct {
 	// Holds a reference to the main metrics container this is a part of
 	metrics *Metrics
 
+	// General Service Metrics
+	gotVersionResponse bool
+	version            *prometheus.GaugeVec
+
 	// Timelord Metrics
 	fastestTimelord    *wrappedPrometheus.LazyCounter
 	slowTimelord       *wrappedPrometheus.LazyCounter
@@ -32,6 +38,9 @@ type TimelordServiceMetrics struct {
 
 // InitMetrics sets all the metrics properties
 func (s *TimelordServiceMetrics) InitMetrics(network *string) {
+	// General Service Metrics
+	s.version = s.metrics.newGaugeVec(chikServiceTimelord, "version", "The version of chik-blockchain the service is running", []string{"version"})
+
 	s.fastestTimelord = s.metrics.newCounter(chikServiceTimelord, "fastest_timelord", "Counter for how many times this timelord has been fastest since the exporter has been running")
 	s.slowTimelord = s.metrics.newCounter(chikServiceTimelord, "slow_timelord", "Counter for how many times this timelord has NOT been the fastest since the exporter has been running")
 	s.estimatedIPS = s.metrics.newGauge(chikServiceTimelord, "estimated_ips", "Current estimated IPS. Updated every time a new PoT Challenge is complete")
@@ -44,14 +53,17 @@ func (s *TimelordServiceMetrics) InitMetrics(network *string) {
 // InitialData is called on startup of the metrics server, to allow seeding metrics with
 // current/initial data
 func (s *TimelordServiceMetrics) InitialData() {
-	utils.LogErr(s.metrics.client.CrawlerService.GetPeerCounts())
+	// Only get the version on an initial or reconnection
+	utils.LogErr(s.metrics.client.TimelordService.GetVersion(&rpc.GetVersionOptions{}))
 }
 
 // SetupPollingMetrics starts any metrics that happen on an interval
-func (s *TimelordServiceMetrics) SetupPollingMetrics() {}
+func (s *TimelordServiceMetrics) SetupPollingMetrics(ctx context.Context) {}
 
 // Disconnected clears/unregisters metrics when the connection drops
 func (s *TimelordServiceMetrics) Disconnected() {
+	s.version.Reset()
+	s.gotVersionResponse = false
 	s.fastestTimelord.Unregister()
 	s.slowTimelord.Unregister()
 	s.estimatedIPS.Unregister()
@@ -65,8 +77,19 @@ func (s *TimelordServiceMetrics) Reconnected() {
 
 // ReceiveResponse handles crawler responses that are returned over the websocket
 func (s *TimelordServiceMetrics) ReceiveResponse(resp *types.WebsocketResponse) {
+	// Sometimes, when we reconnect, or start exporter before chik is running
+	// the daemon is up before the service, and the initial request for the version
+	// doesn't make it to the service
+	// daemon doesn't queue these messages for later, they just get dropped
+	if !s.gotVersionResponse {
+		utils.LogErr(s.metrics.client.FullNodeService.GetVersion(&rpc.GetVersionOptions{}))
+	}
+
 	//("finished_pot_challenge", "new_compact_proof", "skipping_peak", "new_peak")
 	switch resp.Command {
+	case "get_version":
+		versionHelper(resp, s.version)
+		s.gotVersionResponse = true
 	case "finished_pot":
 		s.FinishedPoT(resp)
 	case "new_compact_proof":

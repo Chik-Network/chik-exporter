@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -28,6 +29,10 @@ type CrawlerServiceMetrics struct {
 	// Holds a reference to the main metrics container this is a part of
 	metrics *Metrics
 
+	// General Service Metrics
+	gotVersionResponse bool
+	version            *prometheus.GaugeVec
+
 	// Current network
 	network *string
 
@@ -50,6 +55,10 @@ type CrawlerServiceMetrics struct {
 // InitMetrics sets all the metrics properties
 func (s *CrawlerServiceMetrics) InitMetrics(network *string) {
 	s.network = network
+
+	// General Service Metrics
+	s.version = s.metrics.newGaugeVec(chikServiceCrawler, "version", "The version of chik-blockchain the service is running", []string{"version"})
+
 	// Crawler Metrics
 	s.totalNodes5Days = s.metrics.newGauge(chikServiceCrawler, "total_nodes_5_days", "Total number of nodes that have been gossiped around the network with a timestamp in the last 5 days. The crawler did not necessarily connect to all of these peers itself.")
 	s.reliableNodes = s.metrics.newGauge(chikServiceCrawler, "reliable_nodes", "reliable nodes are nodes that have port 9678 open and have available space for more peer connections")
@@ -108,14 +117,19 @@ func (s *CrawlerServiceMetrics) initMaxmindASNDB() error {
 
 // InitialData is called on startup of the metrics server, to allow seeding metrics with current/initial data
 func (s *CrawlerServiceMetrics) InitialData() {
+	// Only get the version on an initial or reconnection
+	utils.LogErr(s.metrics.client.CrawlerService.GetVersion(&rpc.GetVersionOptions{}))
+
 	utils.LogErr(s.metrics.client.CrawlerService.GetPeerCounts())
 }
 
 // SetupPollingMetrics starts any metrics that happen on an interval
-func (s *CrawlerServiceMetrics) SetupPollingMetrics() {}
+func (s *CrawlerServiceMetrics) SetupPollingMetrics(ctx context.Context) {}
 
 // Disconnected clears/unregisters metrics when the connection drops
 func (s *CrawlerServiceMetrics) Disconnected() {
+	s.version.Reset()
+	s.gotVersionResponse = false
 	s.totalNodes5Days.Unregister()
 	s.reliableNodes.Unregister()
 	s.ipv4Nodes5Days.Unregister()
@@ -131,7 +145,18 @@ func (s *CrawlerServiceMetrics) Reconnected() {
 
 // ReceiveResponse handles crawler responses that are returned over the websocket
 func (s *CrawlerServiceMetrics) ReceiveResponse(resp *types.WebsocketResponse) {
+	// Sometimes, when we reconnect, or start exporter before chik is running
+	// the daemon is up before the service, and the initial request for the version
+	// doesn't make it to the service
+	// daemon doesn't queue these messages for later, they just get dropped
+	if !s.gotVersionResponse {
+		utils.LogErr(s.metrics.client.FullNodeService.GetVersion(&rpc.GetVersionOptions{}))
+	}
+
 	switch resp.Command {
+	case "get_version":
+		versionHelper(resp, s.version)
+		s.gotVersionResponse = true
 	case "get_peer_counts":
 		fallthrough
 	case "loaded_initial_peers":

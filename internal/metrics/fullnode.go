@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,10 @@ const (
 type FullNodeServiceMetrics struct {
 	// Holds a reference to the main metrics container this is a part of
 	metrics *Metrics
+
+	// General Service Metrics
+	gotVersionResponse bool
+	version            *prometheus.GaugeVec
 
 	// GetBlockchainState Metrics
 	difficulty          *wrappedPrometheus.LazyGauge
@@ -94,6 +99,9 @@ type FullNodeServiceMetrics struct {
 
 // InitMetrics sets all the metrics properties
 func (s *FullNodeServiceMetrics) InitMetrics(network *string) {
+	// General Service Metrics
+	s.version = s.metrics.newGaugeVec(chikServiceFullNode, "version", "The version of chik-blockchain the service is running", []string{"version"})
+
 	// BlockchainState Metrics
 	s.difficulty = s.metrics.newGauge(chikServiceFullNode, "difficulty", "Current network difficulty")
 	s.mempoolCost = s.metrics.newGauge(chikServiceFullNode, "mempool_cost", "Current mempool size in cost")
@@ -151,25 +159,36 @@ func (s *FullNodeServiceMetrics) InitMetrics(network *string) {
 // InitialData is called on startup of the metrics server, to allow seeding metrics with
 // current/initial data
 func (s *FullNodeServiceMetrics) InitialData() {
+	// Only get the version on an initial or reconnection
+	utils.LogErr(s.metrics.client.FullNodeService.GetVersion(&rpc.GetVersionOptions{}))
+
 	// Ask for some initial data so we dont have to wait as long
 	utils.LogErr(s.metrics.client.FullNodeService.GetBlockchainState()) // Also calls get_connections once we get the response
 	utils.LogErr(s.metrics.client.FullNodeService.GetBlockCountMetrics())
 	s.GetFeeEstimates()
-
-	// Things that update in the background
-	go func() {
-		for {
-			s.RefreshFileSizes()
-			time.Sleep(30 * time.Second)
-		}
-	}()
 }
 
 // SetupPollingMetrics starts any metrics that happen on an interval
-func (s *FullNodeServiceMetrics) SetupPollingMetrics() {}
+func (s *FullNodeServiceMetrics) SetupPollingMetrics(ctx context.Context) {
+	// Things that update in the background
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				// Exit the loop if the context is canceled
+				return
+			default:
+				s.RefreshFileSizes()
+				time.Sleep(30 * time.Second)
+			}
+		}
+	}(ctx)
+}
 
 // Disconnected clears/unregisters metrics when the connection drops
 func (s *FullNodeServiceMetrics) Disconnected() {
+	s.version.Reset()
+	s.gotVersionResponse = false
 	s.difficulty.Unregister()
 	s.mempoolCost.Unregister()
 	s.mempoolMinFee.Reset()
@@ -211,7 +230,18 @@ func (s *FullNodeServiceMetrics) Reconnected() {
 
 // ReceiveResponse handles full node related responses that are returned over the websocket
 func (s *FullNodeServiceMetrics) ReceiveResponse(resp *types.WebsocketResponse) {
+	// Sometimes, when we reconnect, or start exporter before chik is running
+	// the daemon is up before the service, and the initial request for the version
+	// doesn't make it to the service
+	// daemon doesn't queue these messages for later, they just get dropped
+	if !s.gotVersionResponse {
+		utils.LogErr(s.metrics.client.FullNodeService.GetVersion(&rpc.GetVersionOptions{}))
+	}
+
 	switch resp.Command {
+	case "get_version":
+		versionHelper(resp, s.version)
+		s.gotVersionResponse = true
 	case "get_blockchain_state":
 		s.GetBlockchainState(resp)
 		// Ask for connection info when we get updated blockchain state
@@ -405,6 +435,7 @@ func (s *FullNodeServiceMetrics) RefreshFileSizes() {
 	cfg, err := config.GetChikConfig()
 	if err != nil {
 		log.Errorf("Error getting chik config: %s\n", err.Error())
+		return
 	}
 	database := cfg.GetFullPath(cfg.FullNode.DatabasePath)
 	databaseWal := fmt.Sprintf("%s-wal", database)

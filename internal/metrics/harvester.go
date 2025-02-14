@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -22,6 +23,12 @@ import (
 type HarvesterServiceMetrics struct {
 	// Holds a reference to the main metrics container this is a part of
 	metrics *Metrics
+
+	// General Service Metrics
+	gotVersionResponse bool
+	version            *prometheus.GaugeVec
+
+	gotPlotsResponse bool
 
 	// Connection Metrics
 	connectionCount *prometheus.GaugeVec
@@ -48,6 +55,9 @@ type HarvesterServiceMetrics struct {
 
 // InitMetrics sets all the metrics properties
 func (s *HarvesterServiceMetrics) InitMetrics(network *string) {
+	// General Service Metrics
+	s.version = s.metrics.newGaugeVec(chikServiceHarvester, "version", "The version of chik-blockchain the service is running", []string{"version"})
+
 	// Connection Metrics
 	s.connectionCount = s.metrics.newGaugeVec(chikServiceHarvester, "connection_count", "Number of active connections for each type of peer", []string{"node_type"})
 
@@ -70,17 +80,27 @@ func (s *HarvesterServiceMetrics) InitMetrics(network *string) {
 
 // InitialData is called on startup of the metrics server, to allow seeding metrics with current/initial data
 func (s *HarvesterServiceMetrics) InitialData() {
+	// Only get the version on an initial or reconnection
+	utils.LogErr(s.metrics.client.HarvesterService.GetVersion(&rpc.GetVersionOptions{}))
+
 	s.httpGetPlots()
 }
 
 // SetupPollingMetrics starts any metrics that happen on an interval
-func (s *HarvesterServiceMetrics) SetupPollingMetrics() {
-	go func() {
+func (s *HarvesterServiceMetrics) SetupPollingMetrics(ctx context.Context) {
+	// Things that update in the background
+	go func(ctx context.Context) {
 		for {
-			utils.LogErr(s.metrics.client.HarvesterService.GetConnections(&rpc.GetConnectionsOptions{}))
-			time.Sleep(15 * time.Second)
+			select {
+			case <-ctx.Done():
+				// Exit the loop if the context is canceled
+				return
+			default:
+				utils.LogErr(s.metrics.client.HarvesterService.GetConnections(&rpc.GetConnectionsOptions{}))
+				time.Sleep(15 * time.Second)
+			}
 		}
-	}()
+	}(ctx)
 }
 
 func (s *HarvesterServiceMetrics) httpGetPlots() {
@@ -106,6 +126,9 @@ func (s *HarvesterServiceMetrics) httpGetPlots() {
 
 // Disconnected clears/unregisters metrics when the connection drops
 func (s *HarvesterServiceMetrics) Disconnected() {
+	s.version.Reset()
+	s.gotVersionResponse = false
+	s.gotPlotsResponse = false
 	s.connectionCount.Reset()
 	s.totalPlots.Unregister()
 	s.plotFilesize.Reset()
@@ -122,13 +145,28 @@ func (s *HarvesterServiceMetrics) Reconnected() {
 
 // ReceiveResponse handles crawler responses that are returned over the websocket
 func (s *HarvesterServiceMetrics) ReceiveResponse(resp *types.WebsocketResponse) {
+	// Sometimes, when we reconnect, or start exporter before chik is running
+	// the daemon is up before the service, and the initial request for the version
+	// doesn't make it to the service
+	// daemon doesn't queue these messages for later, they just get dropped
+	if !s.gotVersionResponse {
+		utils.LogErr(s.metrics.client.FullNodeService.GetVersion(&rpc.GetVersionOptions{}))
+	}
+	if !s.gotPlotsResponse {
+		s.httpGetPlots()
+	}
+
 	switch resp.Command {
+	case "get_version":
+		versionHelper(resp, s.version)
+		s.gotVersionResponse = true
 	case "get_connections":
 		s.GetConnections(resp)
 	case "farming_info":
 		s.FarmingInfo(resp)
 	case "get_plots":
 		s.GetPlots(resp)
+		s.gotPlotsResponse = true
 	case "debug":
 		debugHelper(resp, s.debug)
 	}
